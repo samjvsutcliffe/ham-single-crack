@@ -61,7 +61,7 @@
                 ;; :visc-power 3d0
 
                 :initiation-stress 0.1d6
-                :damage-rate 1d-2
+                :damage-rate 1d-1
                 :critical-damage 0.50d0
                 :local-length 20d0
                 :local-length-damaged 0.1d0
@@ -76,7 +76,7 @@
       (let ((mass-scale 1d0))
         (setf (cl-mpm::sim-mass-scale sim) mass-scale)
         (setf (cl-mpm:sim-damping-factor sim)
-              (* 0.0001d0 mass-scale)
+              (* 0.1d0 mass-scale)
               ;; 1d0
               ;; (* 0.00000001d0 mass-scale)
               ;0.1d0
@@ -108,7 +108,8 @@
       (format t "Bottom level ~F~%" h-y)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
-            (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
+            ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
+             (ocean-y (* 0.0d0 terminus-size))
             ;(angle -1d0)
             )
 
@@ -138,20 +139,23 @@
            (* *ice-density* 1d3)
            0.0d0
            ))
-        ;(setf (cl-mpm::sim-bcs-force-list sim)
-        ;      (list
-        ;       (cl-mpm/bc:make-bcs-from-list
-        ;        (list
-        ;         (cl-mpm/buoyancy::make-bc-buoyancy
-        ;          sim
-        ;          ocean-y
-        ;          *water-density*
-        ;          )
-        ;         ))
-        ;       (cl-mpm/bc:make-bcs-from-list
-        ;        (list *floor-bc*)
-        ;        )
-        ;       ))
+        (setf (cl-mpm::sim-bcs-force-list sim)
+              (list
+               (cl-mpm/bc:make-bcs-from-list
+                (list
+                 (cl-mpm/buoyancy::make-bc-buoyancy-clip
+                  sim
+                  ocean-y
+                  *water-density*
+                  (lambda (pos)
+                    (and
+                     (>= (magicl:tref pos 0 0) *crack-water-width*)
+                     )))
+                 ))
+               ;(cl-mpm/bc:make-bcs-from-list
+               ; (list *floor-bc*)
+               ; )
+               ))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
