@@ -61,7 +61,7 @@
                 ;; :visc-power 3d0
 
                 :initiation-stress 0.1d6
-                :damage-rate 1d-1
+                :damage-rate 1d0
                 :critical-damage 0.50d0
                 :local-length 20d0
                 :local-length-damaged 0.1d0
@@ -91,6 +91,7 @@
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) t)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-enable-damage sim) nil)
+      (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
       (setf (cl-mpm:sim-dt sim) 1d-4)
       (setf (cl-mpm:sim-bcs sim) (make-array 0))
       (setf (cl-mpm:sim-bcs sim)
@@ -109,7 +110,7 @@
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
-             (ocean-y (* 0.0d0 terminus-size))
+             (ocean-y (* 0.5d0 terminus-size))
             ;(angle -1d0)
             )
 
@@ -139,6 +140,7 @@
            (* *ice-density* 1d3)
            0.0d0
            ))
+        (defparameter *crack-water-width* (- (first block-size) h-x))
         (setf (cl-mpm::sim-bcs-force-list sim)
               (list
                (cl-mpm/bc:make-bcs-from-list
@@ -318,7 +320,7 @@
   (cl-mpm/output:save-vtk-mesh (merge-pathnames "output/mesh.vtk")
                           *sim*)
   (defparameter *run-sim* t)
-  (let* ((target-time 1d0)
+  (let* ((target-time 0.1d0)
          (dt-scale 1d0)
          (substeps (floor target-time (cl-mpm::sim-dt *sim*))))
     (cl-mpm::update-sim *sim*)
@@ -340,7 +342,7 @@
                            (progn
                              (setf (cl-mpm::sim-enable-damage *sim*) t)
                              (setf (cl-mpm::sim-damping-factor *sim*) base-damping
-                                   dt-scale 1d0)
+                                   dt-scale 0.1d0)
                              )
                            (progn
                              (setf (cl-mpm::sim-enable-damage *sim*) nil

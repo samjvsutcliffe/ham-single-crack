@@ -23,9 +23,10 @@ plt.rc('axes', labelsize=8)
 width = 3.487
 height = width / 1.618
 
-ice_height = 200
+ice_height = 125
+ice_length = 500
 
-water_height = 10
+water_height = 0.5 * ice_height
 
 plt.close("all")
 output_dir = "./output/"
@@ -48,7 +49,7 @@ for i,dname in enumerate(files_csvs):
 
 subprocess.run("rm ./outframes/*", shell=True)
 
-xlim = [0,500]
+xlim = [0,600]
 ylim = [0,200]
 
 fig = plt.figure(figsize=(16,9),dpi=200)
@@ -58,7 +59,7 @@ for frame,i in enumerate(range(len(full_data))):
     df = full_data[i]
 
     patch_list=[]
-    patch = Rectangle(xy=(0,0) ,width=xlim[1], height=water_height,color="blue")
+    patch = Rectangle(xy=(ice_length,0) ,width=xlim[1], height=water_height,color="blue")
     patch_sea = [patch]
     ps = PatchCollection(patch_sea)
     ax.add_collection(ps)
