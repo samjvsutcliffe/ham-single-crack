@@ -8,10 +8,9 @@
 (ql:quickload "magicl")
 (ql:quickload "cl-mpm")
 (asdf:compile-system :cl-mpm :force T)
-(ql:quickload "cl-mpm/examples/slump")
-(asdf:compile-system :cl-mpm/examples/slump :force T)
-(in-package :cl-mpm/examples/slump)
-;(ql:quickload "cl-mpm")
+(ql:quickload "cl-mpm/examples/single-crack")
+(asdf:compile-system :cl-mpm/examples/single-crack :force T)
+(in-package :cl-mpm/examples/single-crack)
 
 (defun rectangle-sdf (position size)
   (lambda (pos)
@@ -61,15 +60,22 @@
                 ;; :visc-power 3d0
 
                 :initiation-stress 0.1d6
-                :damage-rate 1d0
+                :damage-rate 0d0
                 :critical-damage 0.50d0
-                :local-length 20d0
-                :local-length-damaged 0.1d0
+                :local-length 50d0
+                :local-length-damaged 50d0
+                ;; :local-length-damaged 20d0
+                ;; :local-length-damaged 0.1d0
                 :damage 0.0d0
 
                 :gravity -9.8d0
                 ;; :gravity-axis (magicl:from-list '(0.5d0 0.5d0) '(2 1))
                 :index 0
+                ;; :damage-model
+                ;; (cl-mpm/damage::make-damage-model-creep
+                ;;  :damage-rate 1d-4
+                ;;  :initiation-stress 0.01d6
+                ;;  )
                 ;:angle angle
                 )))
         )
@@ -79,7 +85,7 @@
               (* 0.1d0 mass-scale)
               ;; 1d0
               ;; (* 0.00000001d0 mass-scale)
-              ;0.1d0
+              ;; 0.1d0
               ;; 0.01d0
               ;; 0.1d0
               ;; 0.0d0
@@ -91,7 +97,7 @@
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) t)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-enable-damage sim) nil)
-      (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
+      (setf (cl-mpm::sim-mp-damage-removal-instant sim) t)
       (setf (cl-mpm:sim-dt sim) 1d-4)
       (setf (cl-mpm:sim-bcs sim) (make-array 0))
       (setf (cl-mpm:sim-bcs sim)
@@ -101,36 +107,18 @@
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil)))
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0)))
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0)))
-             ;; (lambda (i) (cl-mpm/bc:make-bc-fixed (mapcar #'+ i '(0 0)) '(nil nil)))
-             ;; (lambda (i) (cl-mpm/bc:make-bc-surface (mapcar #'+ i '(0 1))
-             ;;                                        (magicl:from-list (list 0d0 1d0) '(2 1))))
-             ;; (lambda (i) (cl-mpm/bc:make-bc-surface i (magicl:from-list (list 0d0 1d0) '(2 1))))
              ))
       (format t "Bottom level ~F~%" h-y)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
-             (ocean-y (* 0.5d0 terminus-size))
+             (ocean-y (* 0.0d0 terminus-size))
             ;(angle -1d0)
             )
 
-        ;; (loop for mp across (cl-mpm:sim-mps sim)
-        ;;       do
-        ;;          (with-accessors ((pos cl-mpm/particle:mp-position)
-        ;;                           (stress cl-mpm/particle::mp-stress-kirchoff)
-        ;;                           (undamaged-stress cl-mpm/particle::mp-undamaged-stress)
-        ;;                           (stress-cauchy cl-mpm/particle::mp-stress)
-        ;;                           )
-        ;;              mp
-        ;;            (setf stress
-        ;;                  (cl-mpm/utils:matrix-to-voight
-        ;;                   (magicl:eye 2 :value (* 1d0 (cl-mpm/buoyancy::pressure-at-depth (magicl:tref pos 1 0) ocean-y *water-density*))))
-        ;;                  stress-cauchy (magicl:scale stress 1d0)
-        ;;                  undamaged-stress (magicl:scale stress 1d0)
-        ;;                  )))
-
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
+        (defparameter *meltwater-fill* 0.50d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -140,7 +128,20 @@
            (* *ice-density* 1d3)
            0.0d0
            ))
+        (defparameter *crack-water-height* terminus-size)
+        (setf *crack-water-height* 0d0)
         (defparameter *crack-water-width* (- (first block-size) h-x))
+        (defparameter *crack-water-bc*
+          (cl-mpm/buoyancy::make-bc-buoyancy-clip
+           sim
+           ocean-y
+           *water-density*
+           (lambda (pos datum)
+             (and
+              (< (magicl:tref pos 0 0) *crack-water-width*)
+              ;; (< (magicl:tref pos 1 0) datum)
+              ))))
+
         (setf (cl-mpm::sim-bcs-force-list sim)
               (list
                (cl-mpm/bc:make-bcs-from-list
@@ -149,15 +150,35 @@
                   sim
                   ocean-y
                   *water-density*
-                  (lambda (pos)
+                  (lambda (pos datum)
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))
+                 ;; (cl-mpm/buoyancy::make-bc-buoyancy
+                 ;;  sim
+                 ;;  ocean-y
+                 ;;  *water-density*
+                 ;;  )
+                 *crack-water-bc*
                  ))
-               ;(cl-mpm/bc:make-bcs-from-list
-               ; (list *floor-bc*)
-               ; )
+               ;; (cl-mpm/bc:make-bcs-from-list
+               ;;  (list *floor-bc*)
+               ;;  )
                ))
+        ;; (setf (cl-mpm::sim-bcs-force-list sim)
+        ;;       (list
+        ;;        (cl-mpm/bc:make-bcs-from-list
+        ;;         (list
+        ;;          (cl-mpm/buoyancy::make-bc-buoyancy
+        ;;           sim
+        ;;           ocean-y
+        ;;           *water-density*
+        ;;           )
+        ;;          ))
+        ;;        (cl-mpm/bc:make-bcs-from-list
+        ;;         (list *floor-bc*)
+        ;;         )
+        ;;        ))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
@@ -173,10 +194,10 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 50)
          (mps-per-cell 2)
-         (shelf-height 125)
-         (shelf-length 500)
+         (shelf-height 120)
+         (shelf-length 600)
          (offset (list 0 0))
          )
     (defparameter *sim*
@@ -187,81 +208,31 @@
                          (/ 1 mesh-size) mps-per-cell))
 
     ;;Delete all the plotted frames
+    (ensure-directories-exist (uiop:merge-pathnames* "./output/"))
+    (ensure-directories-exist (uiop:merge-pathnames* "./outframes/"))
     (loop for f in (uiop:directory-files (uiop:merge-pathnames* "./outframes/")) do (uiop:delete-file-if-exists f))
-    (cl-mpm/setup::remove-sdf
-     *sim*
-     (rectangle-sdf
-      (list (* 0.5d0 shelf-length)
-            shelf-height)
-      (list
-       10
-       20
-       )))
-    ;; (damage-sdf *sim* (lambda (p) (line-sdf p
-    ;;                                         (list (- shelf-length shelf-height) shelf-height)
-    ;;                                         (list shelf-length 0d0)
-    ;;                                         50d0
-    ;;                                         )) 0.9d0)
-    ;; (damage-sdf *sim* (lambda (p) (line-sdf p
-    ;;                                         (list 0d0 shelf-height)
-    ;;                                         (list shelf-length shelf-height)
-    ;;                                         50d0
-    ;;                                         )) 0.4d0)
-    ;; (loop for mp across (cl-mpm:sim-mps *sim*)
-    ;;       do
-    ;;          (setf (cl-mpm/particle:mp-damage mp) (random 0.5d0)))
-    ;; (let* ((normal (cl-mpm/fastmath::norm
-    ;;                 (magicl:from-list (list
-    ;;                                    (- slope)
-    ;;                                    1d0) '(2 1))))
-    ;;        )
-    ;;   (remove-sdf *sim*
-    ;;               (lambda (p)
-    ;;                 (plane-point-sdf
-    ;;                  p
-    ;;                  normal
-    ;;                  (magicl:from-list (list shelf-length
-    ;;                                          shelf-height-terminus)
-    ;;                                    '(2 1) :type 'double-float)))))
-    ;; (let* ((undercut-angle -70d0)
-    ;;        (normal (magicl:from-list (list
-    ;;                                   (cos (- (* pi (/ undercut-angle 180d0))))
-    ;;                                   (sin (- (* pi (/ undercut-angle 180d0))))) '(2 1)))
-    ;;        (cutback (* shelf-height (/ 1d0 (cos (- (* pi (/ undercut-angle 180d0)))))))
-    ;;        )
-    ;;   (remove-sdf *sim* (lambda (p) (plane-point-sdf p
-    ;;                                                  normal
-    ;;                                                  (magicl:from-list (list (- shelf-length cutback)
-    ;;                                                                          shelf-height)
-    ;;                                                                    '(2 1) :type 'double-float)
-    ;;                                                  ))))
-    ;; (let* ((undercut-angle 10d0)
-    ;;        (normal (magicl:from-list (list
-    ;;                                        (cos (- (* pi (/ undercut-angle 180d0))))
-    ;;                                        (sin (- (* pi (/ undercut-angle 180d0))))) '(2 1))))
-    ;;   (remove-sdf *sim* (lambda (p) (plane-point-sdf p
-    ;;                                                  normal
-    ;;                                                  (magicl:from-list (list shelf-length shelf-height)
-    ;;                                                                    '(2 1) :type 'double-float)
-    ;;                                                  ))))
-    ;; (let* ((n (magicl:from-list (list shelf-height
-    ;;                                   (* 3d0 shelf-length)) '(2 1) :type 'double-float))
-    ;;       (d (plane-sdf (magicl:from-list (list 0d0 shelf-height) '(2 1) :type 'double-float) n 0d0))
-    ;;       )
-    ;;   (remove-sdf *sim* (lambda (p) (plane-sdf p
-    ;;                                            n
-    ;;                                            (- d)
-    ;;                                            ))))
+    (let ((cut-depth 20))
+      (cl-mpm/setup::remove-sdf
+       *sim*
+       (rectangle-sdf
+        (list (* 0.5d0 shelf-length)
+              shelf-height)
+        (list
+         10
+         cut-depth
+         )))
+      (defparameter *ice-height* shelf-height)
+      (defparameter *ice-length* shelf-length)
+      (defparameter *original-crack-height* (- shelf-height cut-depth))
+      )
+    (loop for mp across (cl-mpm:sim-mps *sim*)
+          when
+          (or
+           (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* 0.25d0 shelf-length))
+           (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* 0.75d0 shelf-length))
+           )
+          do (setf  (cl-mpm/particle::mp-damage-rate mp) 0d0))
     )
-  ;; (damage-sdf *sim* (lambda (p) (line-sdf p
-  ;;                                         (list 0d0 0d0)
-  ;;                                         (list 100d0 0d0)
-  ;;                                         100d0
-  ;;                                         )) 0.8))
-  ;; (defparameter *sim* (setup-test-column '(1 1) '(1 1) '(0 0) 1 1))
-  ;; (remove-sdf *sim* (ellipse-sdf (list 250 100) 20 40))
-  ;; (remove-sdf *sim* (ellipse-sdf (list 2 50 100) 20 40))
-  ;; (remove-sdf *sim* (ellipse-sdf (list 1.5 3) 0.25 0.5))
   (print (cl-mpm:sim-dt *sim*))
   (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*)))
   (defparameter *velocity* '())
@@ -316,6 +287,30 @@
 
 (defparameter *run-sim* nil)
 
+(defun get-crack-waterlevel (fill-percent)
+  (let ((min-damage 0.5d0))
+    (let ((min *original-crack-height*))
+      (cl-mpm::iterate-over-nodes-serial
+       (cl-mpm:sim-mesh *sim*)
+       (lambda (node)
+         (let ((ypos (magicl:tref (cl-mpm/mesh::node-position node) 1 0)))
+           (when (and
+                  (< (magicl:tref (cl-mpm/mesh::node-position node) 0 0) *crack-water-width*)
+                  ;; (> (cl-mpm/mesh::node-damage node) 0.4d0)
+                  (< (cl-mpm/mesh::node-volume node) (* 0.9d0 (cl-mpm/mesh::node-volume-true node)))
+                  ;; (cl-mpm/mesh::node-boundary-node node)
+                  )
+             (setf min (min ypos min))
+             ))
+         ))
+      (let ((v (+ min
+                  (* fill-percent
+                     (- *ice-height* min)))))
+        ;; (print v)
+        (setf *crack-water-height* v)
+        (setf (cl-mpm/buoyancy::bc-buoyancy-datum *crack-water-bc*) v)
+        v
+        ))))
 (defun run ()
   (cl-mpm/output:save-vtk-mesh (merge-pathnames "output/mesh.vtk")
                           *sim*)
@@ -323,60 +318,120 @@
   (let* ((target-time 0.1d0)
          (dt-scale 1d0)
          (substeps (floor target-time (cl-mpm::sim-dt *sim*))))
+
     (cl-mpm::update-sim *sim*)
     (time (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
                  (substeps-e (floor target-time dt-e)))
             (format t "CFL dt estimate: ~f~%" dt-e)
             (format t "CFL step count estimate: ~D~%" substeps-e)
             (setf (cl-mpm:sim-dt *sim*) dt-e)
-            (setf substeps substeps-e))
-          
-          )
+            (setf substeps substeps-e)))
     (format t "Substeps ~D~%" substeps)
     (time (loop for steps from 0 to 100
                 while *run-sim*
                 do
-                (progn
-					(let ((base-damping 1d-3))
-                       (if (> steps 5)
-                           (progn
-                             (setf (cl-mpm::sim-enable-damage *sim*) t)
-                             (setf (cl-mpm::sim-damping-factor *sim*) base-damping
-                                   dt-scale 0.1d0)
-                             )
-                           (progn
-                             (setf (cl-mpm::sim-enable-damage *sim*) nil
-                                   (cl-mpm::sim-damping-factor *sim*)
-                                   (+ (* 1d0 (cl-mpm::sim-mass-scale *sim*)
-                                         (exp (- steps))
+                   (progn
+                     (let ((base-damping 1d0))
+                       (when (= steps 30)
+                         (progn
+                           (setf (cl-mpm::sim-enable-damage *sim*) t)
+                           (setf (cl-mpm::sim-damping-factor *sim*) base-damping
+                                 ;; dt-scale 0.1d0
+                                 ;; target-time 1d-2
+                                 )
+                           (let* ((crack-width (/ 50d0 *ice-length*))
+                                  (init-stress
+                                   (loop for mp across (cl-mpm:sim-mps *sim*)
+                                         when
+                                         (and
+                                          (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
+                                          (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*)))
+                                         maximize (cl-mpm/particle::mp-damage-ybar mp)
+                                          )
                                          )
-                                      base-damping)
-                                   )
-                             )
+                                  (init-stress-reduced (* 0.1d0 init-stress))
+                                  )
+                             (format t "Bounds ~F - ~F~%" (* (- 0.5d0 crack-width) *ice-length*) (* (+ 0.5d0 crack-width) *ice-length*))
+                             (format t "Init stress found at :~F MPa~%" (* 1d-6 init-stress-reduced))
+                           (loop for mp across (cl-mpm:sim-mps *sim*)
+                                 when
+                                 (and
+                                  (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
+                                  (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
+                                  )
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-1
+                                           (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
+                                           ))
+                           )))
+                       (when (= steps 0)
+                         (progn
+                           (setf (cl-mpm::sim-enable-damage *sim*) t
+                                 (cl-mpm::sim-damping-factor *sim*)
+                                 base-damping
+                                 ;; (+ (* 1d0 (cl-mpm::sim-mass-scale *sim*)
+                                 ;;       (exp (- steps))
+                                 ;;       )
+                                 ;;    base-damping)
+                                 )
                            ))
-                  (push *t* *time*)
-                  (format t "Step ~d ~%" steps)
+                       )
+                     (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
+                            (substeps-e (floor target-time dt-e)))
+                       (format t "CFL dt estimate: ~f~%" dt-e)
+                       (format t "CFL step count estimate: ~D~%" substeps-e)
+                       (setf (cl-mpm:sim-dt *sim*) dt-e)
+                       (setf substeps substeps-e))
+                     (format t "Damping ~F~%" (cl-mpm::sim-damping-factor *sim*))
+                     ;; (when (> steps 2)
+                     ;;   (setf dt-scale 1d0)
+                     ;;     )
+                     (format t "Step ~d ~%" steps)
+                     (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
+                     (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*)
+                     (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
 
-                  (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
-                  (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
+                     (push *t* *time*)
+                     ;; (let ((cfl (find-max-cfl *sim*)))
+                     ;;   (push cfl *cfl-max*))
+                     (setf *x*
+                           (loop for mp across (cl-mpm:sim-mps *sim*)
+                                 maximize (magicl:tref (cl-mpm/particle::mp-displacement mp) 0 0)))
+                     (push
+                      *x*
+                      *x-pos*)
+                     (let ((cfl 0))
+                       (time (dotimes (i substeps)
+                               (cl-mpm::update-sim *sim*)
+                               (defparameter *crack-depth* 0d0)
+                               (when *crack-water-bc*
+                                 (defparameter *crack-depth* (get-crack-waterlevel *meltwater-fill*)))
+                               (setf *t* (+ *t* (cl-mpm::sim-dt *sim*)))))
 
-                  (incf *sim-step*)
-                  (time (dotimes (i substeps)
-                          (cl-mpm::update-sim *sim*)
-                          (setf *t* (+ *t* (cl-mpm::sim-dt *sim*)))
-                          ))
-                  (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
-                         (substeps-e (floor target-time dt-e)))
-                    (format t "CFL dt estimate: ~f~%" dt-e)
-                    (format t "CFL step count estimate: ~D~%" substeps-e)
-                    (setf (cl-mpm:sim-dt *sim*) dt-e)
-                    (setf substeps substeps-e))
-                  ))))
-    (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
+                       (format t "Crack depth: ~F~%" *crack-depth*)
+                       (format t "Crack depth %: ~F~%" (- 1 (/ *crack-depth* *ice-height*)))
+                       (format t "CFL: ~f~%" cfl)
+                       (push cfl *cfl-max*)
+                       ;; (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
+                       ;;        (substeps-e (floor target-time dt-e)))
+                       ;;   (format t "CFL dt estimate: ~f~%" dt-e)
+                       ;;   (format t "CFL step count estimate: ~D~%" substeps-e)
+                       ;;   (setf (cl-mpm:sim-dt *sim*) dt-e)
+                       ;;   (setf substeps substeps-e))
+                         )
+                     (incf *sim-step*)
+                     (cl-mpm/examples/single-crack::plot *sim*)
+                     (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
+                                        :terminal "png size 1920,1080"
+                                        )
+                     (swank.live:update-swank)
+                     (sleep .01)
+                     ))))
+  (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
   )
 
 
-(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+(setf lparallel:*kernel* (lparallel:make-kernel 4 :name "custom-kernel"))
 (require :sb-sprof)
 (defparameter *run-sim* nil)
 (setup)
