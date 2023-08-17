@@ -226,8 +226,8 @@
                 :initiation-stress 0.1d6
                 :damage-rate 0d0
                 :critical-damage 0.50d0
-                :local-length 50d0
-                :local-length-damaged 50d0
+                :local-length 20d0
+                :local-length-damaged 20d0
                 ;; :local-length-damaged 20d0
                 ;; :local-length-damaged 0.1d0
                 :damage 0.0d0
@@ -276,13 +276,13 @@
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
-             (ocean-y (* 0.0d0 terminus-size))
+             (ocean-y (* 0.5d0 terminus-size))
             ;(angle -1d0)
             )
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.50d0)
+        (defparameter *meltwater-fill* 0.20d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -361,7 +361,7 @@
   (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 120)
-         (shelf-length 600)
+         (shelf-length 500)
          (offset (list 0 0))
          )
     (defparameter *sim*
@@ -496,12 +496,12 @@
                 while *run-sim*
                 do
                    (progn
-                     (let ((base-damping 1d1))
+                     (let ((base-damping 1d0))
                        (when (= steps 20)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*) base-damping
-                                 ;; dt-scale 0.1d0
+                                 dt-scale 1d0
                                  ;; target-time 1d-2
                                  )
                            (let* ((crack-width 0.2d0;(/ 50d0 *ice-length*)
@@ -515,7 +515,8 @@
                                          maximize (cl-mpm/particle::mp-damage-ybar mp)
                                           )
                                          )
-                                  (init-stress-reduced (* 0.1d0 init-stress))
+                                  (init-stress-reduced (* 0.10d0 init-stress))
+                                  (init-stress-reduced 0.01d6)
                                   )
                              (format t "Bounds ~F - ~F~%" (* (- 0.5d0 crack-width) *ice-length*) (* (+ 0.5d0 crack-width) *ice-length*))
                              (format t "Init stress found at :~F MPa~%" (* 1d-6 init-stress-reduced))
@@ -525,7 +526,7 @@
                                   (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-3
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -533,7 +534,8 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t
                                  (cl-mpm::sim-damping-factor *sim*)
-                                 base-damping
+                                 1d1
+                                 ;; base-damping
                                  ;; (+ (* 1d0 (cl-mpm::sim-mass-scale *sim*)
                                  ;;       (exp (- steps))
                                  ;;       )
