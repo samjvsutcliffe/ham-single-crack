@@ -1,7 +1,7 @@
 (restrict-compiler-policy 'speed 3 3)
 (restrict-compiler-policy 'debug 0 0)
 (restrict-compiler-policy 'safety 0 0)
-;; (setf *block-compile-default* t)
+(setf *block-compile-default* t)
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
 (setf *features* (delete :cl-mpm-pic *features*))
@@ -220,6 +220,7 @@
                 'cl-mpm/particle::particle-elastic-damage
                 :E 1d9
                 :nu 0.3250d0
+                ;; :nu 0.0000d0
                 ;; :visc-factor 111d6
                 ;; :visc-power 3d0
 
@@ -243,7 +244,7 @@
                 ;:angle angle
                 )))
         )
-      (let ((mass-scale 1d0))
+      (let ((mass-scale 1d1))
         (setf (cl-mpm::sim-mass-scale sim) mass-scale)
         (setf (cl-mpm:sim-damping-factor sim)
               (* 0.1d0 mass-scale)
@@ -282,7 +283,7 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.20d0)
+        (defparameter *meltwater-fill* 1.00d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -318,31 +319,7 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))
-                 ;; (cl-mpm/buoyancy::make-bc-buoyancy
-                 ;;  sim
-                 ;;  ocean-y
-                 ;;  *water-density*
-                 ;;  )
-                 *crack-water-bc*
-                 ))
-               ;; (cl-mpm/bc:make-bcs-from-list
-               ;;  (list *floor-bc*)
-               ;;  )
-               ))
-        ;; (setf (cl-mpm::sim-bcs-force-list sim)
-        ;;       (list
-        ;;        (cl-mpm/bc:make-bcs-from-list
-        ;;         (list
-        ;;          (cl-mpm/buoyancy::make-bc-buoyancy
-        ;;           sim
-        ;;           ocean-y
-        ;;           *water-density*
-        ;;           )
-        ;;          ))
-        ;;        (cl-mpm/bc:make-bcs-from-list
-        ;;         (list *floor-bc*)
-        ;;         )
-        ;;        ))
+                 *crack-water-bc*))))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
@@ -358,7 +335,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
          (shelf-height 120)
          (shelf-length 500)
@@ -480,7 +457,7 @@
   (cl-mpm/output:save-vtk-mesh (merge-pathnames "output/mesh.vtk")
                           *sim*)
   (defparameter *run-sim* t)
-  (let* ((target-time 0.1d0)
+  (let* ((target-time 1d0)
          (dt-scale 1d0)
          (substeps (floor target-time (cl-mpm::sim-dt *sim*))))
 
@@ -496,15 +473,32 @@
                 while *run-sim*
                 do
                    (progn
-                     (let ((base-damping 1d0))
-                       (when (= steps 20)
+                     (let ((base-damping 1d1))
+                       ;; (let ((damping-step 10)
+                       ;;       (damping-final 1d-3)
+                       ;;       (damping-speed 50))
+                       ;;   (when (> steps damping-step)
+                       ;;     (setf (cl-mpm::sim-damping-factor *sim*)
+                       ;;           (max
+                       ;;            (* (exp (/ (- damping-step steps) 5)) base-damping)
+                       ;;            1d-3
+                       ;;            )
+                       ;;           ;; dt-scale 0.1d0
+                       ;;           ;; target-time 1d-2
+                       ;;           )
+                       ;;     ))
+                       (when (= steps 10)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
-                           (setf (cl-mpm::sim-damping-factor *sim*) base-damping
-                                 dt-scale 1d0
+                           (setf (cl-mpm::sim-damping-factor *sim*)
+                                 0d0
+                                 ;; base-damping
+                                 ;; (* base-damping 0.1)
+                                 ;; dt-scale 0.1d0
                                  ;; target-time 1d-2
                                  )
-                           (let* ((crack-width 0.2d0;(/ 50d0 *ice-length*)
+                           (let* ((crack-width ;; 0.1d0
+                                        (/ 50d0 *ice-length*)
                                                )
                                   (init-stress
                                    (loop for mp across (cl-mpm:sim-mps *sim*)
@@ -526,18 +520,16 @@
                                   (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-3
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
                        (when (= steps 0)
                          (progn
-                           (setf (cl-mpm::sim-enable-damage *sim*) t
+                           (setf (cl-mpm::sim-enable-damage *sim*) nil
                                  (cl-mpm::sim-damping-factor *sim*)
-                                 1d1
-                                 ;; base-damping
-                                 ;; (+ (* 1d0 (cl-mpm::sim-mass-scale *sim*)
-                                 ;;       (exp (- steps))
+                                 base-damping
+                                 ;; (+ (* 1d0 (cl-mpm::sim-mass-scale *sim*) ;;       (exp (- steps))
                                  ;;       )
                                  ;;    base-damping)
                                  )
@@ -587,13 +579,17 @@
                          )
                      (incf *sim-step*)
                      (cl-mpm/examples/single-crack::plot *sim*)
-                     ;; (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
-                     ;;                    :terminal "png size 1920,1080"
-                     ;;                    )
+                     (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
+                                        :terminal "png size 1920,1080"
+                                        )
                      (swank.live:update-swank)
                      (sleep .01)
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
+  (when *crack-water-bc*
+    (defparameter *crack-depth* (get-crack-waterlevel *meltwater-fill*)))
+  (format t "Crack depth: ~F~%" *crack-depth*)
+  (format t "Crack depth %: ~F~%" (- 1 (/ *crack-depth* *ice-height*)))
   )
 
 
