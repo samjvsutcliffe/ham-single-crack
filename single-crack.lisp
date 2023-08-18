@@ -1,15 +1,13 @@
-(restrict-compiler-policy 'speed 3 3)
-(restrict-compiler-policy 'debug 0 0)
-(restrict-compiler-policy 'safety 0 0)
-(setf *block-compile-default* t)
+;; (restrict-compiler-policy 'speed 3 3)
+;; (restrict-compiler-policy 'debug 0 0)
+;; (restrict-compiler-policy 'safety 0 0)
+;; (setf *block-compile-default* t)
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
 (setf *features* (delete :cl-mpm-pic *features*))
 (ql:quickload "magicl")
 (ql:quickload "cl-mpm")
-;; (asdf:compile-system :cl-mpm :force T)
 (ql:quickload "cl-mpm/examples/single-crack")
-;; (asdf:compile-system :cl-mpm/examples/single-crack :force T)
 (in-package :cl-mpm/examples/single-crack)
 
 (defun plot (sim &optional (plot :damage))
@@ -244,7 +242,7 @@
                 ;:angle angle
                 )))
         )
-      (let ((mass-scale 1d1))
+      (let ((mass-scale 1d0))
         (setf (cl-mpm::sim-mass-scale sim) mass-scale)
         (setf (cl-mpm:sim-damping-factor sim)
               (* 0.1d0 mass-scale)
@@ -283,7 +281,7 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 1.00d0)
+        (defparameter *meltwater-fill* 0.40d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -303,10 +301,7 @@
            *water-density*
            (lambda (pos datum)
              (and
-              (< (magicl:tref pos 0 0) *crack-water-width*)
-              ;; (< (magicl:tref pos 1 0) datum)
-              ))))
-
+              (< (magicl:tref pos 0 0) *crack-water-width*)))))
         (setf (cl-mpm::sim-bcs-force-list sim)
               (list
                (cl-mpm/bc:make-bcs-from-list
@@ -319,7 +314,8 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))
-                 *crack-water-bc*))))
+                 *crack-water-bc*
+                 ))))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
@@ -445,13 +441,25 @@
              (setf min (min ypos min))
              ))
          ))
-      (let ((v (+ min
+      ;; (loop for mp across (cl-mpm:sim-mps *sim*)
+      ;;       when
+      ;;       (and
+      ;;        (< (magicl:tref (cl-mpm/particle::mp-position mp) 0 0) *crack-water-width*)
+      ;;        ;; (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
+      ;;        ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
+      ;;        (> (cl-mpm/particle::mp-damage mp) min-damage)
+      ;;        )
+      ;;       do (setf min (min (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) min)))
+      (let* ((crack-depth (- *ice-height* min))
+            (v (+ min
                   (* fill-percent
-                     (- *ice-height* min)))))
+                     crack-depth
+                     ))))
         ;; (print v)
         (setf *crack-water-height* v)
         (setf (cl-mpm/buoyancy::bc-buoyancy-datum *crack-water-bc*) v)
-        v
+        ;; v
+        (- *ice-height* crack-depth)
         ))))
 (defun run ()
   (cl-mpm/output:save-vtk-mesh (merge-pathnames "output/mesh.vtk")
@@ -469,7 +477,7 @@
             (setf (cl-mpm:sim-dt *sim*) dt-e)
             (setf substeps substeps-e)))
     (format t "Substeps ~D~%" substeps)
-    (time (loop for steps from 0 to 100
+    (time (loop for steps from 0 to 30
                 while *run-sim*
                 do
                    (progn
@@ -487,16 +495,17 @@
                        ;;           ;; target-time 1d-2
                        ;;           )
                        ;;     ))
-                       (when (= steps 10)
+                       (when (= steps 4)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
-                           (setf (cl-mpm::sim-damping-factor *sim*)
-                                 0d0
-                                 ;; base-damping
-                                 ;; (* base-damping 0.1)
-                                 ;; dt-scale 0.1d0
-                                 ;; target-time 1d-2
-                                 )
+                           ;; (setf (cl-mpm::sim-damping-factor *sim*)
+                           ;;       0d0
+                           ;;       ;; 1d0
+                           ;;       ;; base-damping
+                           ;;       ;; (* base-damping 0.1)
+                           ;;       ;; dt-scale 0.1d0
+                           ;;       ;; target-time 1d-2
+                           ;;       )
                            (let* ((crack-width ;; 0.1d0
                                         (/ 50d0 *ice-length*)
                                                )
@@ -520,7 +529,7 @@
                                   (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-3
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-1
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
