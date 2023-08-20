@@ -11,6 +11,28 @@
 (in-package :cl-mpm/examples/single-crack)
 (defparameter *debug* t)
 
+(defparameter *ice-height* 0d0)
+(defparameter *ice-length* 0d0)
+(defparameter *crack-depth* 0d0)
+(defparameter *original-crack-height* 0d0)
+(defparameter *last-min* 0d0)
+(defparameter *water-height* 0d0)
+(defparameter *crack-water-width* 0d0)
+(defparameter *meltwater-fill* 0.20d0)
+(defparameter *floor-bc* nil)
+(defparameter *sim* nil)
+(defparameter *t* 0)
+(defparameter *crack-water-bc* nil)
+(defparameter *crack-water-height* 0d0)
+(defparameter *sim-step* 0d0)
+(defparameter *velocity* '())
+(defparameter *time* '())
+(defparameter *t* 0)
+(defparameter *x* 0d0)
+(defparameter *x-pos* '())
+(defparameter *cfl-max* '())
+(defparameter *sim-step* 0)
+
 (defun plot (sim &optional (plot :point))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
@@ -37,7 +59,8 @@
           collect (/ (cl-mpm/particle:mp-mass mp) (cl-mpm/particle:mp-volume mp)) into density
           ;; collect (cl-mpm/particle:mp-volume mp) into density
           collect (max-stress mp) into stress-y
-          collect (local-dist sim mp) into dist
+          ;; collect (local-dist sim mp) into dist
+          collect 0d0 into dist
           finally (return (values x y c stress-y lx ly e density temp vx ybar dist)))
 
     (let* ((node-x '())
@@ -161,7 +184,7 @@
          (vgplot:plot x y e ";;with points pt 7 lc palette")
          )))
     )
-  (vgplot:format-plot t "replot (~f*x + ~f)~%" *sliding-slope* *sliding-offset*)
+  ;; (vgplot:format-plot t "replot (~f*x + ~f)~%" *sliding-slope* *sliding-offset*)
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
          (ms-x (first ms))
          (ms-y (second ms))
@@ -415,7 +438,7 @@
     ;; (increase-load *sim* *terminus-mps*
     ;;                (magicl:from-list (list (* 1d4) 0d0) '(2 1)))
     )
-  (defparameter *dist-mp* (nth 0 *terminus-mps*))
+  ;; (defparameter *dist-mp* (nth 0 *terminus-mps*))
   ;; (increase-load *sim* *load-mps* 1)
   ;; (increase-load *sim* *load-mps* 100)
   )
