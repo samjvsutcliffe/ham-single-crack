@@ -9,8 +9,9 @@
 (ql:quickload "cl-mpm")
 (ql:quickload "cl-mpm/examples/single-crack")
 (in-package :cl-mpm/examples/single-crack)
+(defparameter *debug* t)
 
-(defun plot (sim &optional (plot :damage))
+(defun plot (sim &optional (plot :point))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
@@ -226,9 +227,9 @@
                 :damage-rate 0d0
                 :critical-damage 0.50d0
                 :local-length 20d0
-                :local-length-damaged 20d0
                 ;; :local-length-damaged 20d0
-                ;; :local-length-damaged 0.1d0
+                ;; :local-length-damaged 20d0
+                :local-length-damaged 0.1d0
                 :damage 0.0d0
 
                 :gravity -9.8d0
@@ -281,7 +282,7 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.40d0)
+        (defparameter *meltwater-fill* 0.20d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -331,7 +332,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 120)
          (shelf-length 500)
@@ -362,6 +363,7 @@
       (defparameter *ice-length* shelf-length)
       (defparameter *crack-depth* 0d0)
       (defparameter *original-crack-height* (- shelf-height cut-depth))
+      (defparameter *last-min* *original-crack-height*)
       )
     (loop for mp across (cl-mpm:sim-mps *sim*)
           when
@@ -417,7 +419,6 @@
   ;; (increase-load *sim* *load-mps* 1)
   ;; (increase-load *sim* *load-mps* 100)
   )
-(defparameter *water-height* 0d0)
 
 
 
@@ -426,30 +427,32 @@
 (defparameter *run-sim* nil)
 
 (defun get-crack-waterlevel (fill-percent)
-  (let ((min-damage 0.5d0))
+  (let ((min-damage 0.4d0))
     (let ((min *original-crack-height*))
-      (cl-mpm::iterate-over-nodes-serial
-       (cl-mpm:sim-mesh *sim*)
-       (lambda (node)
-         (let ((ypos (magicl:tref (cl-mpm/mesh::node-position node) 1 0)))
-           (when (and
-                  (< (magicl:tref (cl-mpm/mesh::node-position node) 0 0) *crack-water-width*)
-                  ;; (> (cl-mpm/mesh::node-damage node) 0.4d0)
-                  (< (cl-mpm/mesh::node-volume node) (* 0.9d0 (cl-mpm/mesh::node-volume-true node)))
-                  ;; (cl-mpm/mesh::node-boundary-node node)
-                  )
-             (setf min (min ypos min))
-             ))
-         ))
-      ;; (loop for mp across (cl-mpm:sim-mps *sim*)
-      ;;       when
-      ;;       (and
-      ;;        (< (magicl:tref (cl-mpm/particle::mp-position mp) 0 0) *crack-water-width*)
-      ;;        ;; (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
-      ;;        ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
-      ;;        (> (cl-mpm/particle::mp-damage mp) min-damage)
-      ;;        )
-      ;;       do (setf min (min (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) min)))
+      ;; (cl-mpm::iterate-over-nodes-serial
+      ;;  (cl-mpm:sim-mesh *sim*)
+      ;;  (lambda (node)
+      ;;    (let ((ypos (magicl:tref (cl-mpm/mesh::node-position node) 1 0)))
+      ;;      (when (and
+      ;;             (< (magicl:tref (cl-mpm/mesh::node-position node) 0 0) *crack-water-width*)
+      ;;             ;; (> (cl-mpm/mesh::node-damage node) 0.4d0)
+      ;;             (< (cl-mpm/mesh::node-volume node) (* 0.9d0 (cl-mpm/mesh::node-volume-true node)))
+      ;;             ;; (cl-mpm/mesh::node-boundary-node node)
+      ;;             )
+      ;;        (setf min (min ypos min))
+      ;;        ))
+      ;;    ))
+      (loop for mp across (cl-mpm:sim-mps *sim*)
+            when
+            (and
+             (< (magicl:tref (cl-mpm/particle::mp-position mp) 0 0) *crack-water-width*)
+             ;; (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
+             ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
+             (> (cl-mpm/particle::mp-damage mp) min-damage)
+             )
+            do (setf min (min (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) min)))
+      (setf min (min *last-min* min))
+      (setf *last-min* min)
       (let* ((crack-depth (- *ice-height* min))
             (v (+ min
                   (* fill-percent
@@ -477,7 +480,7 @@
             (setf (cl-mpm:sim-dt *sim*) dt-e)
             (setf substeps substeps-e)))
     (format t "Substeps ~D~%" substeps)
-    (time (loop for steps from 0 to 30
+    (time (loop for steps from 0 to 100
                 while *run-sim*
                 do
                    (progn
@@ -495,7 +498,7 @@
                        ;;           ;; target-time 1d-2
                        ;;           )
                        ;;     ))
-                       (when (= steps 4)
+                       (when (= steps 3)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            ;; (setf (cl-mpm::sim-damping-factor *sim*)
@@ -529,7 +532,7 @@
                                   (>= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (- 0.5d0 crack-width) *ice-length*))
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-1
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -587,12 +590,13 @@
                        ;;   (setf substeps substeps-e))
                          )
                      (incf *sim-step*)
-                     (cl-mpm/examples/single-crack::plot *sim*)
-                     (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
-                                        :terminal "png size 1920,1080"
-                                        )
-                     (swank.live:update-swank)
-                     (sleep .01)
+                     (when *debug*
+                       (plot *sim*)
+                       (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
+                                          :terminal "png size 1920,1080"
+                                          )
+                       (swank.live:update-swank)
+                       (sleep .01))
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
   (when *crack-water-bc*
@@ -604,9 +608,30 @@
 
 ;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
 (setf lparallel:*kernel* (lparallel:make-kernel 4 :name "custom-kernel"))
-(require :sb-sprof)
-(defparameter *run-sim* nil)
-(setup)
-(format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-(run)
+;; (require :sb-sprof)
+;; (defparameter *run-sim* nil)
+;; (setup)
+;; (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+;; (run)
 
+
+(defun test-bounds ()
+  (let ((mesh (cl-mpm:sim-mesh *sim*)))
+    (time-form
+     1000000
+     ;; (dotimes (i 100000))
+     (progn
+       (cl-mpm/mesh:in-bounds mesh '(0 0))))))
+
+(defun test-all-meltwater ()
+  (loop for mw from 0.0d0 to 1d0 by 0.1d0
+        for i from 0
+        do (progn
+             (setup)
+             (defparameter *meltwater-fill* mw)
+             (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+             (run)
+             (format t "Meltwater: ~F - Crack depth %: ~F~%" mw (- 1 (/ *crack-depth* *ice-height*)))
+             (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" i)) *sim*)
+
+             )))
