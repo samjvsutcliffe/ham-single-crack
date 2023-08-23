@@ -7,7 +7,7 @@
 (setf *features* (delete :cl-mpm-pic *features*))
 (ql:quickload "magicl")
 (ql:quickload "cl-mpm")
-(ql:quickload "cl-mpm/examples/single-crack")
+(ql:quickload "cl-mpm/examples/single-crack" :silent t)
 (in-package :cl-mpm/examples/single-crack)
 (defparameter *debug* t)
 
@@ -305,7 +305,7 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.40d0)
+        (defparameter *meltwater-fill* 0.00d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -339,11 +339,11 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))
-                 *crack-water-bc*
-                 (cl-mpm/bc::make-bc-closure
-                  '(0 0)
-                  (lambda ()
-                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
+                 ;; *crack-water-bc*
+                 ;; (cl-mpm/bc::make-bc-closure
+                 ;;  '(0 0)
+                 ;;  (lambda ()
+                 ;;    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
                  ))))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
@@ -360,7 +360,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 20)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -530,7 +530,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 1d0)
+                                 1d1)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -550,7 +550,7 @@
                                           )
                                          )
                                   (init-stress-reduced (* 0.10d0 init-stress))
-                                  (init-stress-reduced 0.01d6)
+                                  (init-stress-reduced 0.1d6)
                                   )
                              (format t "Bounds ~F - ~F~%" (* (- 0.5d0 crack-width) *ice-length*) (* (+ 0.5d0 crack-width) *ice-length*))
                              (format t "Init stress found at :~F MPa~%" (* 1d-6 init-stress-reduced))
@@ -561,7 +561,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -660,7 +660,7 @@
 
              )))
 
-(defparameter *debug* nil)
+(defparameter *debug* t)
 (if *debug*
   (progn
     (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
