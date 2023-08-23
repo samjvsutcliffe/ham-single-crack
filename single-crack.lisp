@@ -240,7 +240,7 @@
                 density
                 ;'cl-mpm/particle::particle-viscoplastic-damage
                 'cl-mpm/particle::particle-elastic-damage
-                :E 1d9
+                :E 1.5d9
                 :nu 0.3250d0
                 ;; :nu 0.0000d0
                 ;; :visc-factor 111d6
@@ -322,7 +322,8 @@
           (cl-mpm/buoyancy::make-bc-buoyancy-clip
            sim
            ocean-y
-           *water-density*
+           ;*water-density*
+           1000d0
            (lambda (pos datum)
              (and
               (< (magicl:tref pos 0 0) *crack-water-width*)))))
@@ -351,8 +352,8 @@
         (defparameter *sliding-offset* (- h-y (* 0d0 0d0))))
       sim)))
 
-(defparameter *ice-density* 900)
-(defparameter *water-density* 1000)
+(defparameter *ice-density* 917)
+(defparameter *water-density* 1020)
 ;; (defparameter *ice-density* 900)
 ;; (defparameter *water-density* 1000)
 ;Setup
@@ -586,7 +587,7 @@
                      ;;   (setf dt-scale 1d0)
                      ;;     )
                      (format t "Step ~d ~%" steps)
-                     (when *debug*
+                     (when t;*debug*
                        (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*))
                      ;; (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*)
                      ;; (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
@@ -659,6 +660,7 @@
 
              )))
 
+(defparameter *debug* nil)
 (if *debug*
   (progn
     (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
@@ -666,5 +668,10 @@
     (setup)
     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
     (run))
-  (test-all-meltwater)
-  )
+  (progn
+    (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+    ;(test-all-meltwater)
+    (setup)
+    (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+    (run)
+    ))
