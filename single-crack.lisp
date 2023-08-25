@@ -339,11 +339,11 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))
-                 ;; *crack-water-bc*
-                 ;; (cl-mpm/bc::make-bc-closure
-                 ;;  '(0 0)
-                 ;;  (lambda ()
-                 ;;    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
+                 *crack-water-bc*
+                 (cl-mpm/bc::make-bc-closure
+                  '(0 0)
+                  (lambda ()
+                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
                  ))))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
@@ -360,7 +360,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -537,7 +537,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 1d1)
+                                 0d1)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -568,7 +568,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -595,8 +595,8 @@
                      ;;     )
                      (format t "Step ~d ~%" steps)
                      (when t;*debug*
-                       (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*))
-                     ;; (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*)
+                       (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
+                       (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*))
                      ;; (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
 
                      (push *t* *time*)
