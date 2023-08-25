@@ -299,13 +299,13 @@
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
-             (ocean-y (* 0.5d0 terminus-size))
+             (ocean-y (* (round (* 0.5d0 terminus-size) h-y) h-y))
             ;(angle -1d0)
             )
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.00d0)
+        (defparameter *meltwater-fill* 0.50d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -360,7 +360,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 20)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -481,17 +481,24 @@
             do (setf min (min (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) min)))
       (setf min (min *last-min* min))
       (setf *last-min* min)
-      (let* ((crack-depth (- *ice-height* min))
-            (v (+ min
-                  (* fill-percent
-                     crack-depth
-                     ))))
-        ;; (print v)
-        (setf *crack-water-height* v)
-        (setf (cl-mpm/buoyancy::bc-buoyancy-datum *crack-water-bc*) v)
-        ;; v
-        (- *ice-height* crack-depth)
-        ))))
+
+      (with-accessors ((mesh cl-mpm:sim-mesh))
+          *sim*
+        (let ((h (cl-mpm/mesh::mesh-resolution mesh)))
+          (let* ((crack-depth (- *ice-height* min))
+                 (v (+ min
+                       (* fill-percent
+                          crack-depth
+                          )))
+                 ;;Normalise to mesh
+                 (v (* (round v h) h))
+                 )
+            ;; (print v)
+            (setf *crack-water-height* v)
+            (setf (cl-mpm/buoyancy::bc-buoyancy-datum *crack-water-bc*) v)
+            ;; v
+            (- *ice-height* crack-depth)
+            ))))))
 (defun run ()
   (cl-mpm/output:save-vtk-mesh (merge-pathnames "output/mesh.vtk")
                           *sim*)
