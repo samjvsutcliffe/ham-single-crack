@@ -4,11 +4,19 @@
 ;; (setf *block-compile-default* t)
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
-(setf *features* (delete :cl-mpm-pic *features*))
-(ql:quickload "magicl")
-(ql:quickload "cl-mpm")
-(ql:quickload "cl-mpm/examples/single-crack" :silent t)
-(in-package :cl-mpm/examples/single-crack)
+;; (setf *features* (delete :cl-mpm-pic *features*))
+(defpackage :ham-single-crack
+  (:use :cl
+        :cl-mpm/examples/single-crack))
+(sb-ext:restrict-compiler-policy 'speed  3 3)
+(sb-ext:restrict-compiler-policy 'debug  0 0)
+(sb-ext:restrict-compiler-policy 'safety 0 0)
+(in-package :ham-single-crack)
+
+;; (ql:quickload "magicl")
+;; (ql:quickload "cl-mpm")
+;; (ql:quickload "cl-mpm/examples/single-crack" :silent t)
+;; (in-package :cl-mpm/examples/single-crack)
 (defparameter *debug* t)
 
 (defparameter *ice-height* 0d0)
@@ -360,7 +368,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
