@@ -41,7 +41,30 @@
 (defparameter *cfl-max* '())
 (defparameter *sim-step* 0)
 
-(defun plot (sim &optional (plot :damage))
+(defun length-from-def (sim mp dim)
+  (let* ((mp-scale 2)
+         (h-initial (magicl:tref (cl-mpm/particle::mp-domain-size mp) dim 0))
+                                        ;(h-initial  (/ (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh sim)) mp-scale))
+         )
+    h-initial
+                                        ;(* (magicl:tref (cl-mpm::mp-deformation-gradient mp) dim dim) h-initial)
+    ))
+(defun max-stress (mp)
+  (declare (optimize (speed 0) (debug 3)))
+  (multiple-value-bind (l v) (magicl:eig (cl-mpm::voight-to-matrix (cl-mpm/particle:mp-stress mp)))
+                                        ;(apply #'max l)
+    ;; (- (max 0d0 (apply #'max l))
+    ;;    (max 0d0 (apply #'min l)))
+    ;; (cl-mpm/fastmath::voigt-tensor-reduce-simd (cl-mpm/particle::mp-velocity-rate mp))
+    ;; (magicl:tref (cl-mpm/particle::mp-velocity-rate mp) 2 0)
+    ;; (cl-mpm/particle::mp-damage-ybar mp)
+    ;; (cl-mpm/constitutive::effective-strain-rate (cl-mpm/particle::mp-eng-strain-rate mp))
+    ;; (cl-mpm/particle::mp-time-averaged-visc mp)
+    (magicl:tref (cl-mpm/particle::mp-stress mp) 2 0)
+    )
+  )
+
+(defun plot (sim &optional (plot :point))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
@@ -365,6 +388,7 @@
 ;; (defparameter *ice-density* 900)
 ;; (defparameter *water-density* 1000)
 ;Setup
+;; (defparameter *run-sim* nil)
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
@@ -512,7 +536,7 @@
                           *sim*)
   (defparameter *run-sim* t)
   (let* ((target-time 1d0)
-         (dt-scale 1d0)
+         (dt-scale 1.0d0)
          (substeps (floor target-time (cl-mpm::sim-dt *sim*))))
 
     (cl-mpm::update-sim *sim*)
@@ -545,7 +569,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 0d1)
+                                 1d0)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -576,7 +600,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d2
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
