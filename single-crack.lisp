@@ -297,7 +297,7 @@
                 ;:angle angle
                 )))
         )
-      (let ((mass-scale 1d0))
+      (let ((mass-scale 1d1))
         (setf (cl-mpm::sim-mass-scale sim) mass-scale)
         (setf (cl-mpm:sim-damping-factor sim)
               (* 0.1d0 mass-scale)
@@ -569,7 +569,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 1d0)
+                                 0.1d0)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -577,7 +577,7 @@
                            ;;       ;; target-time 1d-2
                            ;;       )
                            (let* ((crack-width ;; 0.1d0
-                                        (/ 50d0 *ice-length*)
+                                        (/ 20d0 *ice-length*)
                                                )
                                   (init-stress
                                    (loop for mp across (cl-mpm:sim-mps *sim*)
@@ -600,7 +600,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
