@@ -5,6 +5,7 @@
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
 ;; (setf *features* (delete :cl-mpm-pic *features*))
+(ql:quickload "cl-mpm/examples/single-crack" :silent t)
 (defpackage :ham-single-crack
   (:use :cl
         :cl-mpm/examples/single-crack))
@@ -60,11 +61,11 @@
     ;; (cl-mpm/particle::mp-damage-ybar mp)
     ;; (cl-mpm/constitutive::effective-strain-rate (cl-mpm/particle::mp-eng-strain-rate mp))
     ;; (cl-mpm/particle::mp-time-averaged-visc mp)
-    (magicl:tref (cl-mpm/particle::mp-stress mp) 2 0)
+    (magicl:tref (cl-mpm/particle::mp-stress mp) 0 0)
     )
   )
 
-(defun plot (sim &optional (plot :point))
+(defun plot (sim &optional (plot :damage))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
@@ -315,7 +316,7 @@
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) t)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-enable-damage sim) nil)
-      (setf (cl-mpm::sim-mp-damage-removal-instant sim) t)
+      (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
       (setf (cl-mpm:sim-dt sim) 1d-4)
       (setf (cl-mpm:sim-bcs sim) (make-array 0))
       (setf (cl-mpm:sim-bcs sim)
@@ -324,13 +325,14 @@
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil)))
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil)))
              (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0)))
-             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0)))
+             (lambda (i) (cl-mpm/bc:make-bc-fixed (mapcar #'+ i '(0 0)) '(nil 0)))
              ))
       (format t "Bottom level ~F~%" h-y)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
-             (ocean-y (* (round (* 0.5d0 terminus-size) h-y) h-y))
+             ;; (ocean-y (* (round (* 0.5d0 terminus-size) h-y) h-y))
+             (ocean-y (+ 0d0 (* 0.50d0 terminus-size)))
             ;(angle -1d0)
             )
 
@@ -383,8 +385,8 @@
         (defparameter *sliding-offset* (- h-y (* 0d0 0d0))))
       sim)))
 
-(defparameter *ice-density* 917)
-(defparameter *water-density* 1020)
+(defparameter *ice-density* 917d0)
+(defparameter *water-density* 1020d0)
 ;; (defparameter *ice-density* 900)
 ;; (defparameter *water-density* 1000)
 ;Setup
@@ -536,7 +538,7 @@
                           *sim*)
   (defparameter *run-sim* t)
   (let* ((target-time 1d0)
-         (dt-scale 1.0d0)
+         (dt-scale 1d0)
          (substeps (floor target-time (cl-mpm::sim-dt *sim*))))
 
     (cl-mpm::update-sim *sim*)
@@ -569,7 +571,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 0.1d0)
+                                 1d0)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -700,17 +702,17 @@
              )))
 
 (defparameter *debug* t)
-(if *debug*
-  (progn
-    (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
-    (defparameter *run-sim* nil)
-    (setup)
-    (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-    (run))
-  (progn
-    (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
-    ;(test-all-meltwater)
-    (setup)
-    (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-    (run)
-    ))
+;; (if *debug*
+;;   (progn
+    ;; (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
+;;     (defparameter *run-sim* nil)
+;;     (setup)
+;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+;;     (run))
+;;   (progn
+;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;;     ;(test-all-meltwater)
+;;     (setup)
+;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+;;     (run)
+;;     ))
