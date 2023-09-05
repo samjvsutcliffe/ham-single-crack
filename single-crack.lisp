@@ -65,7 +65,7 @@
     )
   )
 
-(defun plot (sim &optional (plot :damage))
+(defun plot (sim &optional (plot :stress))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
@@ -338,7 +338,7 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.50d0)
+        (defparameter *meltwater-fill* 0.20d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -571,7 +571,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 1d0)
+                                 0d0)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -602,7 +602,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 0d0
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -716,3 +716,27 @@
 ;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
 ;;     (run)
 ;;     ))
+
+(defmacro time-form (it form)
+  `(progn
+     (declaim (optimize speed))
+     (let* ((iterations ,it)
+            (start (get-internal-real-time)))
+       (dotimes (i ,it)
+         ,form)
+       (let* ((end (get-internal-real-time))
+              (units internal-time-units-per-second)
+              (dt (/ (- end start) (* iterations units)))
+              )
+         (format t "Total time: ~f ~%" (/ (- end start) units)) (format t "Time per iteration: ~f~%" (/ (- end start) (* iterations units)))
+         (format t "Throughput: ~f~%" (/ 1 dt))
+         dt))))
+(defun simple-time (&optional (k 8))
+  (declare (optimize (speed 3) (debug 0) (safety 0)))
+  (setf lparallel:*kernel* (lparallel:make-kernel k :name "custom-kernel"))
+  (setup)
+  (let ((iters 1000))
+      (format t "Testing normal ~%")
+    (time
+     (time-form iters
+                (cl-mpm::update-sim *sim*)))))
