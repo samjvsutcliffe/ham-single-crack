@@ -40,6 +40,7 @@
 (defparameter *x* 0d0)
 (defparameter *x-pos* '())
 (defparameter *cfl-max* '())
+(defparameter *max-stress* '())
 (defparameter *sim-step* 0)
 
 (defun length-from-def (sim mp dim)
@@ -53,7 +54,7 @@
 (defun max-stress (mp)
   (declare (optimize (speed 0) (debug 3)))
   (multiple-value-bind (l v) (magicl:eig (cl-mpm::voight-to-matrix (cl-mpm/particle:mp-stress mp)))
-                                        ;(apply #'max l)
+    (apply #'max l)
     ;; (- (max 0d0 (apply #'max l))
     ;;    (max 0d0 (apply #'min l)))
     ;; (cl-mpm/fastmath::voigt-tensor-reduce-simd (cl-mpm/particle::mp-velocity-rate mp))
@@ -61,7 +62,7 @@
     ;; (cl-mpm/particle::mp-damage-ybar mp)
     ;; (cl-mpm/constitutive::effective-strain-rate (cl-mpm/particle::mp-eng-strain-rate mp))
     ;; (cl-mpm/particle::mp-time-averaged-visc mp)
-    (magicl:tref (cl-mpm/particle::mp-stress mp) 0 0)
+    ;; (magicl:tref (cl-mpm/particle::mp-stress mp) 0 0)
     )
   )
 
@@ -371,13 +372,17 @@
                   (lambda (pos datum)
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
-                     )))
-                 *crack-water-bc*
+                     )))))
+               (cl-mpm/bc:make-bcs-from-list
+                (list
+                 *crack-water-bc*))
+               (cl-mpm/bc:make-bcs-from-list
+                (list
                  (cl-mpm/bc::make-bc-closure
                   '(0 0)
                   (lambda ()
-                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
-                 ))))
+                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))))
+               ))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
@@ -444,6 +449,7 @@
   (defparameter *x-pos* '())
   (defparameter *cfl-max* '())
   (defparameter *sim-step* 0)
+  (setf *max-stress* '())
   ;(defparameter *run-sim* t)
   (defparameter *load-mps*
     (let* ((mps (cl-mpm:sim-mps *sim*))
@@ -525,7 +531,7 @@
                           crack-depth
                           )))
                  ;;Normalise to mesh
-                 (v (* (round v h) h))
+                 ;(v (* (round v h) h))
                  )
             ;; (print v)
             (setf *crack-water-height* v)
@@ -571,7 +577,7 @@
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
-                                 1d0)
+                                 1d-2)
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
@@ -602,7 +608,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -634,6 +640,10 @@
                      ;; (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
 
                      (push *t* *time*)
+                     (push
+                      (loop for mp across (cl-mpm:sim-mps *sim*)
+                            maximize (max-stress mp))
+                      *max-stress*)
                      ;; (let ((cfl (find-max-cfl *sim*)))
                      ;;   (push cfl *cfl-max*))
                      (setf *x*
@@ -653,12 +663,12 @@
                        (format t "Crack depth %: ~F~%" (- 1 (/ *crack-depth* *ice-height*)))
                        (format t "CFL: ~f~%" cfl)
                        (push cfl *cfl-max*)
-                       ;; (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
-                       ;;        (substeps-e (floor target-time dt-e)))
-                       ;;   (format t "CFL dt estimate: ~f~%" dt-e)
-                       ;;   (format t "CFL step count estimate: ~D~%" substeps-e)
-                       ;;   (setf (cl-mpm:sim-dt *sim*) dt-e)
-                       ;;   (setf substeps substeps-e))
+                       (let* ((dt-e (* dt-scale (cl-mpm::calculate-min-dt *sim*)))
+                              (substeps-e (floor target-time dt-e)))
+                         (format t "CFL dt estimate: ~f~%" dt-e)
+                         (format t "CFL step count estimate: ~D~%" substeps-e)
+                         (setf (cl-mpm:sim-dt *sim*) dt-e)
+                         (setf substeps substeps-e))
                          )
                      (incf *sim-step*)
                      (when *debug*
@@ -678,6 +688,7 @@
 
 
 ;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;; (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
 
 
 (defun test-bounds ()
@@ -716,3 +727,13 @@
 ;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
 ;;     (run)
 ;;     ))
+
+(time (test-alloc))
+(defun test-alloc ()
+  (dotimes (i 100000)
+    (let ((a (cl-mpm/utils:vector-zeros))
+          (b (cl-mpm/utils:vector-zeros)))
+      (declare (dynamic-extent a b))
+      (magicl.simd::.+-simd a b))))
+
+(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
