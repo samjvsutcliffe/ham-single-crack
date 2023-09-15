@@ -9,9 +9,9 @@
 (defpackage :ham-single-crack
   (:use :cl
         :cl-mpm/examples/single-crack))
-(sb-ext:restrict-compiler-policy 'speed  3 3)
-(sb-ext:restrict-compiler-policy 'debug  0 0)
-(sb-ext:restrict-compiler-policy 'safety 0 0)
+(sb-ext:restrict-compiler-policy 'speed  0 0)
+(sb-ext:restrict-compiler-policy 'debug  3 3)
+(sb-ext:restrict-compiler-policy 'safety 3 3)
 (in-package :ham-single-crack)
 
 ;; (ql:quickload "magicl")
@@ -328,11 +328,12 @@
              (lambda (i) (cl-mpm/bc:make-bc-fixed (mapcar #'+ i '(0 0)) '(nil 0)))
              ))
       (format t "Bottom level ~F~%" h-y)
+      (defparameter *ocean-fill* 0.50d0)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
              ;; (ocean-y (* (round (* 0.5d0 terminus-size) h-y) h-y))
-             (ocean-y (+ 0d0 (* 0.50d0 terminus-size)))
+             (ocean-y (+ 0d0 (* *ocean-fill* terminus-size)))
             ;(angle -1d0)
             )
 
@@ -360,24 +361,24 @@
            (lambda (pos datum)
              (and
               (< (magicl:tref pos 0 0) *crack-water-width*)))))
-        (setf (cl-mpm::sim-bcs-force-list sim)
-              (list
-               (cl-mpm/bc:make-bcs-from-list
-                (list
-                 (cl-mpm/buoyancy::make-bc-buoyancy-clip
-                  sim
-                  ocean-y
-                  *water-density*
-                  (lambda (pos datum)
-                    (and
-                     (>= (magicl:tref pos 0 0) *crack-water-width*)
-                     )))
-                 *crack-water-bc*
-                 (cl-mpm/bc::make-bc-closure
-                  '(0 0)
-                  (lambda ()
-                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
-                 ))))
+        ;(setf (cl-mpm::sim-bcs-force-list sim)
+        ;      (list
+        ;       (cl-mpm/bc:make-bcs-from-list
+        ;        (list
+        ;         (cl-mpm/buoyancy::make-bc-buoyancy-clip
+        ;          sim
+        ;          ocean-y
+        ;          *water-density*
+        ;          (lambda (pos datum)
+        ;            (and
+        ;             (>= (magicl:tref pos 0 0) *crack-water-width*)
+        ;             )))
+        ;         *crack-water-bc*
+        ;         (cl-mpm/bc::make-bc-closure
+        ;          '(0 0)
+        ;          (lambda ()
+        ;            (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))
+        ;         ))))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
                                             (cos (+ (* pi (/ angle 180d0))))) '(2 1))))
@@ -394,7 +395,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -418,7 +419,7 @@
         (list (* 0.5d0 shelf-length)
               shelf-height)
         (list
-         10
+         5
          cut-depth
          )))
       (defparameter *ice-height* shelf-height)
@@ -549,7 +550,7 @@
             (setf (cl-mpm:sim-dt *sim*) dt-e)
             (setf substeps substeps-e)))
     (format t "Substeps ~D~%" substeps)
-    (time (loop for steps from 0 to 100
+    (time (loop for steps from 0 to 30
                 while *run-sim*
                 do
                    (progn
@@ -602,7 +603,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -628,7 +629,7 @@
                      ;;   (setf dt-scale 1d0)
                      ;;     )
                      (format t "Step ~d ~%" steps)
-                     (when t;*debug*
+                     (when nil;*debug*
                        (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
                        (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*))
                      ;; (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
@@ -661,13 +662,13 @@
                        ;;   (setf substeps substeps-e))
                          )
                      (incf *sim-step*)
-                     (when *debug*
-                       (plot *sim*)
-                       (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
-                                          :terminal "png size 1920,1080"
-                                          )
-                       (swank.live:update-swank)
-                       (sleep .01))
+                     ;(when *debug*
+                     ;  (plot *sim*)
+                     ;  (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
+                     ;                     :terminal "png size 1920,1080"
+                     ;                     )
+                     ;  (swank.live:update-swank)
+                     ;  (sleep .01))
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
   (when *crack-water-bc*
@@ -689,30 +690,31 @@
        (cl-mpm/mesh:in-bounds mesh '(0 0))))))
 
 (defun test-all-meltwater ()
-  (loop for mw from 0.0d0 to 1d0 by 0.2d0
+  (loop for mw from 0.0d0 to 1d0 by 0.1d0
         for i from 0
         do (progn
              (setup)
              (defparameter *meltwater-fill* mw)
              (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
              (run)
-             (format t "Meltwater: ~F - Crack depth %: ~F~%" mw (- 1 (/ *crack-depth* *ice-height*)))
+             (format t "Ocean: ~F - Meltwater: ~F - Crack depth %: ~F~%" *ocean-fill* mw (- 1 (/ *crack-depth* *ice-height*)))
              (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" i)) *sim*)
-
              )))
 
-(defparameter *debug* t)
-;; (if *debug*
-;;   (progn
-    ;; (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
-;;     (defparameter *run-sim* nil)
-;;     (setup)
-;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-;;     (run))
-;;   (progn
-;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
-;;     ;(test-all-meltwater)
-;;     (setup)
-;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-;;     (run)
-;;     ))
+(defparameter *debug* nil)
+ (if *debug*
+   (progn
+     ;(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
+     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+     (defparameter *run-sim* nil)
+     (setup)
+     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+     (run))
+   (progn
+     ;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+     (test-all-meltwater)
+     ;(setup)
+     ;(format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+     ;(run)
+     ))
