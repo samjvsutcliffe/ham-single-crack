@@ -1,7 +1,10 @@
-;; (restrict-compiler-policy 'speed 3 3)
-;; (restrict-compiler-policy 'debug 0 0)
-;; (restrict-compiler-policy 'safety 0 0)
-;; (setf *block-compile-default* t)
+(restrict-compiler-policy 'speed 3 3)
+(restrict-compiler-policy 'debug 0 0)
+(restrict-compiler-policy 'safety 0 0)
+(setf *block-compile-default* t)
+;(sb-ext:restrict-compiler-policy 'speed  0 0)
+;(sb-ext:restrict-compiler-policy 'debug  3 3)
+;(sb-ext:restrict-compiler-policy 'safety 3 3)
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
 ;; (setf *features* (delete :cl-mpm-pic *features*))
@@ -9,9 +12,6 @@
 (defpackage :ham-single-crack
   (:use :cl
         :cl-mpm/examples/single-crack))
-(sb-ext:restrict-compiler-policy 'speed  0 0)
-(sb-ext:restrict-compiler-policy 'debug  3 3)
-(sb-ext:restrict-compiler-policy 'safety 3 3)
 (in-package :ham-single-crack)
 
 ;; (ql:quickload "magicl")
@@ -42,6 +42,8 @@
 (defparameter *cfl-max* '())
 (defparameter *max-stress* '())
 (defparameter *sim-step* 0)
+(defparameter *ocean-fill* 0.50d0)
+(defparameter *meltwater-fill* 0.20d0)
 
 (defun length-from-def (sim mp dim)
   (let* ((mp-scale 2)
@@ -329,7 +331,6 @@
              (lambda (i) (cl-mpm/bc:make-bc-fixed (mapcar #'+ i '(0 0)) '(nil 0)))
              ))
       (format t "Bottom level ~F~%" h-y)
-      (defparameter *ocean-fill* 0.50d0)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
              (ocean-x 1000)
             ;; (ocean-y (+ h-y (* 0.90d0 0.0d0 terminus-size)))
@@ -340,7 +341,6 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *meltwater-fill* 0.20d0)
         (defparameter *floor-bc*
           (cl-mpm/penalty::make-bc-penalty-point-normal
            sim
@@ -701,6 +701,12 @@
        (cl-mpm/mesh:in-bounds mesh '(0 0))))))
 
 (defun test-all-meltwater ()
+  (let ((mw (loop for mw from 0.0d0 to 1d0 by 0.1d0))))
+  (with-open-file (stream (merge-pathnames "output/creep.csv") :direction :output :if-exists :supersede)
+    (format stream "ocean-y,")
+    (loop for m in mw
+          do (format stream "~E," m)) )
+  (format stream "~E," *ocean-fill*)
   (loop for mw from 0.0d0 to 1d0 by 0.1d0
         for i from 0
         do (progn
@@ -709,8 +715,15 @@
              (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
              (run)
              (format t "Ocean: ~F - Meltwater: ~F - Crack depth %: ~F~%" *ocean-fill* mw (- 1 (/ *crack-depth* *ice-height*)))
+             (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :append)
+                       (format stream "~f, " *ice-height*))
+
              (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" i)) *sim*)
-             )))
+             ))
+  (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :append)
+    (format stream "~%"))
+  
+  )
 
 (defparameter *debug* nil)
  (if *debug*
