@@ -68,7 +68,7 @@
     )
   )
 
-(defun plot (sim &optional (plot :stress))
+(defun plot (sim &optional (plot :damage))
   (declare (optimize (speed 0) (debug 3)))
   (vgplot:format-plot t "set palette defined (0 'blue', 1 'red')")
   (let* ((ms (cl-mpm/mesh:mesh-mesh-size (cl-mpm:sim-mesh sim)))
@@ -117,7 +117,7 @@
               (when active
                 (if boundary
                     ;; (print index)
-                    (destructuring-bind (x y) (cl-mpm/mesh:index-to-position mesh index)
+                    (destructuring-bind (x y z) (cl-mpm/mesh:index-to-position mesh index)
                       ;; (push (nth 0 index) node-x)
                       ;; (push (nth 1 index) node-y)
                       (push x node-x)
@@ -126,7 +126,7 @@
                       ;; (push n-ratio node-c)
                       ;; (push boundary-s node-c)
                       )
-                    (destructuring-bind (x y) (cl-mpm/mesh:index-to-position mesh index)
+                    (destructuring-bind (x y z) (cl-mpm/mesh:index-to-position mesh index)
                       (push x node-x)
                       (push y node-y)
                       ;; (push n-ratio node-c)
@@ -262,10 +262,7 @@
          (density *ice-density*)
          (elements (mapcar (lambda (s) (* e-scale (/ s 2))) size)))
     (progn
-      (let ((block-position
-              (mapcar #'+ (list (* h-x (- (+ (/ 1 (* 2 mp-scale))) 0))
-                                (* h-y (+ (/ 1d0 (* 2d0 mp-scale)))))
-                      block-offset)))
+      (let ((block-position block-offset))
         (setf (cl-mpm:sim-mps sim)
               (cl-mpm/setup::make-mps-from-list
                (cl-mpm/setup::make-block-mps-list
@@ -319,16 +316,16 @@
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) t)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-enable-damage sim) nil)
-      (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
+      (setf (cl-mpm::sim-mp-damage-removal-instant sim) t)
       (setf (cl-mpm:sim-dt sim) 1d-4)
       (setf (cl-mpm:sim-bcs sim) (make-array 0))
       (setf (cl-mpm:sim-bcs sim)
             (cl-mpm/bc::make-outside-bc-var
              (cl-mpm:sim-mesh sim)
-             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil)))
-             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil)))
-             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0)))
-             (lambda (i) (cl-mpm/bc:make-bc-fixed (mapcar #'+ i '(0 0)) '(nil 0)))
+             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil nil)))
+             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(0 nil nil)))
+             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0 nil)))
+             (lambda (i) (cl-mpm/bc:make-bc-fixed i '(nil 0 nil)))
              ))
       (format t "Bottom level ~F~%" h-y)
       (let* ((terminus-size (+ (second block-size) (* 0d0 (first block-size))))
@@ -374,15 +371,15 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))))
-               (cl-mpm/bc:make-bcs-from-list
-                (list
-                 *crack-water-bc*))
-               (cl-mpm/bc:make-bcs-from-list
-                (list
-                 (cl-mpm/bc::make-bc-closure
-                  '(0 0)
-                  (lambda ()
-                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))))
+               ;; (cl-mpm/bc:make-bcs-from-list
+               ;;  (list
+               ;;   *crack-water-bc*))
+               ;; (cl-mpm/bc:make-bcs-from-list
+               ;;  (list
+               ;;   (cl-mpm/bc::make-bc-closure
+               ;;    '(0 0 0)
+               ;;    (lambda ()
+               ;;      (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))))
                ))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
@@ -400,7 +397,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -424,7 +421,7 @@
         (list (* 0.5d0 shelf-length)
               shelf-height)
         (list
-         5
+         8
          cut-depth
          )))
       (defparameter *ice-height* shelf-height)
@@ -609,8 +606,8 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d-2
-                                           (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                            (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
                        (when (= steps 0)
@@ -635,7 +632,7 @@
                      ;;   (setf dt-scale 1d0)
                      ;;     )
                      (format t "Step ~d ~%" steps)
-                     (when nil;*debug*
+                     (when t;*debug*
                        (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
                        (cl-mpm/output::save-vtk-nodes (merge-pathnames (format nil "output/sim_nodes_~5,'0d.vtk" *sim-step*)) *sim*))
                      ;; (cl-mpm/output:save-csv (merge-pathnames (format nil "output/sim_~5,'0d.csv" *sim-step*)) *sim*)
@@ -673,11 +670,11 @@
                          )
                      (incf *sim-step*)
                      ;(when *debug*
-                     ;  (plot *sim*)
+                      (plot *sim*)
                      ;  (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
                      ;                     :terminal "png size 1920,1080"
                      ;                     )
-                     ;  (swank.live:update-swank)
+                      (swank.live:update-swank)
                      ;  (sleep .01))
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
@@ -725,20 +722,25 @@
   
   )
 
+;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;;     (defparameter *run-sim* nil)
 (defparameter *debug* nil)
- (if *debug*
-   (progn
-     ;(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
-     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
-     (defparameter *run-sim* nil)
-     (setup)
-     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-     (run))
-   (progn
-     ;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
-     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
-     (test-all-meltwater)
-     ;(setup)
-     ;(format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-     ;(run)
-     ))
+    ;; (setup)
+    ;; (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+    ;; (run)
+ ;; (if *debug*
+ ;;   (progn
+ ;;     ;(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
+ ;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+ ;;     (defparameter *run-sim* nil)
+ ;;     (setup)
+ ;;     (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+ ;;     (run))
+ ;;   (progn
+ ;;     ;(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+ ;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+ ;;     (test-all-meltwater)
+ ;;     ;(setup)
+ ;;     ;(format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+ ;;     ;(run)
+ ;;     ))
