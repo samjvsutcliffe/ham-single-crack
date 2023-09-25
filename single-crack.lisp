@@ -235,9 +235,11 @@
 
 (defun rectangle-sdf (position size)
   (lambda (pos)
-      (let* ((position (magicl:from-list position '(2 1) :type 'double-float))
+    (let* ((pos (magicl:from-list (list (magicl:tref pos 0 0)
+                                        (magicl:tref pos 1 0)) '(2 1)))
+             (position (magicl:from-list position '(3 1) :type 'double-float))
              (dist-vec (magicl:.- (magicl:map! #'abs (magicl:.- pos position))
-                                  (magicl:from-list size '(2 1) :type 'double-float))))
+                                  (magicl:from-list size '(3 1) :type 'double-float))))
 
         (+ (sqrt (magicl::sum
                   (magicl:map! (lambda (x) (* x x))
@@ -338,15 +340,15 @@
 
         (format t "Ocean level ~a~%" ocean-y)
         (defparameter *water-height* ocean-y)
-        (defparameter *floor-bc*
-          (cl-mpm/penalty::make-bc-penalty-point-normal
-           sim
-           (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
-                                   (cos (+ (* pi (/ angle 180d0))))) '(2 1))
-           (magicl:from-list (list 00d0 (+ 1d0 h-y)) '(2 1))
-           (* *ice-density* 1d3)
-           0.0d0
-           ))
+        ;; (defparameter *floor-bc*
+        ;;   (cl-mpm/penalty::make-bc-penalty-point-normal
+        ;;    sim
+        ;;    (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
+        ;;                            (cos (+ (* pi (/ angle 180d0))))) '(2 1))
+        ;;    (magicl:from-list (list 00d0 (+ 1d0 h-y)) '(2 1))
+        ;;    (* *ice-density* 1d3)
+        ;;    0.0d0
+        ;;    ))
         (defparameter *crack-water-height* terminus-size)
         (setf *crack-water-height* 0d0)
         (defparameter *crack-water-width* (- (first block-size) h-x))
@@ -397,10 +399,10 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
-         (shelf-height 125)
-         (shelf-length 500)
+         (shelf-height 125d0)
+         (shelf-length 500d0)
          (offset (list 0 0))
          )
     (defparameter *sim*
@@ -421,7 +423,7 @@
         (list (* 0.5d0 shelf-length)
               shelf-height)
         (list
-         8
+         5d0
          cut-depth
          )))
       (defparameter *ice-height* shelf-height)
