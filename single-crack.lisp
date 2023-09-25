@@ -397,7 +397,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 125)
          (shelf-length 500)
@@ -571,7 +571,7 @@
                        ;;           ;; target-time 1d-2
                        ;;           )
                        ;;     ))
-                       (when (= steps 3)
+                       (when (= steps 1)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
                            (setf (cl-mpm::sim-damping-factor *sim*)
