@@ -237,9 +237,9 @@
   (lambda (pos)
     (let* ((pos (magicl:from-list (list (magicl:tref pos 0 0)
                                         (magicl:tref pos 1 0)) '(2 1)))
-             (position (magicl:from-list position '(3 1) :type 'double-float))
+             (position (magicl:from-list position '(2 1) :type 'double-float))
              (dist-vec (magicl:.- (magicl:map! #'abs (magicl:.- pos position))
-                                  (magicl:from-list size '(3 1) :type 'double-float))))
+                                  (magicl:from-list size '(2 1) :type 'double-float))))
 
         (+ (sqrt (magicl::sum
                   (magicl:map! (lambda (x) (* x x))
@@ -399,7 +399,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 10)
+  (let* ((mesh-size 5)
          (mps-per-cell 2)
          (shelf-height 125d0)
          (shelf-length 500d0)
