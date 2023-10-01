@@ -1,10 +1,10 @@
-(restrict-compiler-policy 'speed 3 3)
-(restrict-compiler-policy 'debug 0 0)
-(restrict-compiler-policy 'safety 0 0)
-(setf *block-compile-default* t)
-;(sb-ext:restrict-compiler-policy 'speed  0 0)
-;(sb-ext:restrict-compiler-policy 'debug  3 3)
-;(sb-ext:restrict-compiler-policy 'safety 3 3)
+;; (cl-user::restrict-compiler-policy 'speed 3 3)
+;; (cl-user::restrict-compiler-policy 'debug 0 0)
+;; (cl-user::restrict-compiler-policy 'safety 0 0)
+(setf cl-user::*block-compile-default* nil)
+(sb-ext:restrict-compiler-policy 'speed  0 0)
+(sb-ext:restrict-compiler-policy 'debug  3 3)
+(sb-ext:restrict-compiler-policy 'safety 3 3)
 ;(push :magicl.use-mkl *features*)
 ;(pushnew :cl-mpm-fbar *features*)
 ;; (setf *features* (delete :cl-mpm-pic *features*))
@@ -315,10 +315,10 @@
         )
       (setf (cl-mpm:sim-mass-filter sim) 1d-15)
       (setf (cl-mpm::sim-allow-mp-split sim) nil)
-      (setf (cl-mpm::sim-allow-mp-damage-removal sim) t)
+      (setf (cl-mpm::sim-allow-mp-damage-removal sim) nil)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-enable-damage sim) nil)
-      (setf (cl-mpm::sim-mp-damage-removal-instant sim) t)
+      (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
       (setf (cl-mpm:sim-dt sim) 1d-4)
       (setf (cl-mpm:sim-bcs sim) (make-array 0))
       (setf (cl-mpm:sim-bcs sim)
@@ -373,15 +373,15 @@
                     (and
                      (>= (magicl:tref pos 0 0) *crack-water-width*)
                      )))))
-               ;; (cl-mpm/bc:make-bcs-from-list
-               ;;  (list
-               ;;   *crack-water-bc*))
-               ;; (cl-mpm/bc:make-bcs-from-list
-               ;;  (list
-               ;;   (cl-mpm/bc::make-bc-closure
-               ;;    '(0 0 0)
-               ;;    (lambda ()
-               ;;      (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))))
+               (cl-mpm/bc:make-bcs-from-list
+                (list
+                 *crack-water-bc*))
+               (cl-mpm/bc:make-bcs-from-list
+                (list
+                 (cl-mpm/bc::make-bc-closure
+                  '(0 0 0)
+                  (lambda ()
+                    (cl-mpm/buoyancy::set-pressure-all sim *crack-water-bc*)))))
                ))
         )
       (let ((normal (magicl:from-list (list (sin (- (* pi (/ angle 180d0))))
@@ -399,7 +399,7 @@
 (defun setup ()
   (declare (optimize (speed 0)))
   (defparameter *run-sim* nil)
-  (let* ((mesh-size 5)
+  (let* ((mesh-size 10)
          (mps-per-cell 2)
          (shelf-height 125d0)
          (shelf-length 500d0)
@@ -423,7 +423,7 @@
         (list (* 0.5d0 shelf-length)
               shelf-height)
         (list
-         5d0
+         10d0
          cut-depth
          )))
       (defparameter *ice-height* shelf-height)
@@ -573,11 +573,10 @@
                        ;;           ;; target-time 1d-2
                        ;;           )
                        ;;     ))
-                       (when (= steps 1)
+                       (when (= steps 5)
                          (progn
                            (setf (cl-mpm::sim-enable-damage *sim*) t)
-                           (setf (cl-mpm::sim-damping-factor *sim*)
-                                 0d0)
+                           (setf (cl-mpm::sim-damping-factor *sim*) (* base-damping 0.1d0))
                            ;;       ;; 1d0
                            ;;       ;; base-damping
                            ;;       ;; (* base-damping 0.1)
