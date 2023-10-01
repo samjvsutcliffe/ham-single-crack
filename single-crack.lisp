@@ -285,8 +285,8 @@
                 :critical-damage 0.50d0
                 :local-length 20d0
                 ;; :local-length-damaged 20d0
-                ;; :local-length-damaged 20d0
-                :local-length-damaged 0.1d0
+                :local-length-damaged 20d0
+                ;; :local-length-damaged 0.1d0
                 :damage 0.0d0
 
                 :gravity -9.8d0
@@ -303,7 +303,7 @@
       (let ((mass-scale 1d1))
         (setf (cl-mpm::sim-mass-scale sim) mass-scale)
         (setf (cl-mpm:sim-damping-factor sim)
-              (* 0.1d0 mass-scale)
+              (* 1d-2 mass-scale)
               ;; 1d0
               ;; (* 0.00000001d0 mass-scale)
               ;; 0.1d0
@@ -420,10 +420,10 @@
       (cl-mpm/setup::remove-sdf
        *sim*
        (rectangle-sdf
-        (list (* 0.5d0 shelf-length)
+        (list (+ (* mesh-size (floor (* 0.5d0 shelf-length) mesh-size)) (* 0.5d0 mesh-size))
               shelf-height)
         (list
-         10d0
+         5d0
          cut-depth
          )))
       (defparameter *ice-height* shelf-height)
@@ -495,7 +495,7 @@
 (defparameter *run-sim* nil)
 
 (defun get-crack-waterlevel (fill-percent)
-  (let ((min-damage 0.4d0))
+  (let ((min-damage 0.5d0))
     (let ((min *original-crack-height*))
       ;; (cl-mpm::iterate-over-nodes-serial
       ;;  (cl-mpm:sim-mesh *sim*)
@@ -607,7 +607,7 @@
                                   (<= (magicl:tref (cl-mpm/particle:mp-position mp) 0 0) (* (+ 0.5d0 crack-width) *ice-length*))
                                   ;; (<= (magicl:tref (cl-mpm/particle:mp-position mp) 1 0) (+ *original-crack-height* 0))
                                   )
-                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d0
+                                 do (setf  (cl-mpm/particle::mp-damage-rate mp) 1d2
                                             (cl-mpm/particle::mp-initiation-stress mp) init-stress-reduced
                                            ))
                            )))
@@ -671,11 +671,11 @@
                          )
                      (incf *sim-step*)
                      ;(when *debug*
-                      (plot *sim*)
+                     (plot *sim*)
                      ;  (vgplot:print-plot (merge-pathnames (format nil "outframes/frame_~5,'0d.png" *sim-step*))
                      ;                     :terminal "png size 1920,1080"
                      ;                     )
-                      (swank.live:update-swank)
+                     (swank.live:update-swank)
                      ;  (sleep .01))
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
@@ -699,12 +699,14 @@
        (cl-mpm/mesh:in-bounds mesh '(0 0))))))
 
 (defun test-all-meltwater ()
-  (let ((mw (loop for mw from 0.0d0 to 1d0 by 0.1d0))))
-  (with-open-file (stream (merge-pathnames "output/creep.csv") :direction :output :if-exists :supersede)
-    (format stream "ocean-y,")
-    (loop for m in mw
-          do (format stream "~E," m)) )
-  (format stream "~E," *ocean-fill*)
+  (let ((mw (loop for mw from 0.0d0 to 1d0 by 0.1d0)))
+    (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :supersede)
+      (format stream "ocean-y,")
+      (loop for m in mw
+            do (format stream "~f," m))
+      (format stream "~%")))
+  (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :supersede)
+      (format stream "~f," *ocean-fill*))
   (loop for mw from 0.0d0 to 1d0 by 0.1d0
         for i from 0
         do (progn
@@ -714,8 +716,7 @@
              (run)
              (format t "Ocean: ~F - Meltwater: ~F - Crack depth %: ~F~%" *ocean-fill* mw (- 1 (/ *crack-depth* *ice-height*)))
              (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :append)
-                       (format stream "~f, " *ice-height*))
-
+                       (format stream "~f, " (- 1 (/ *crack-depth* *ice-height*))))
              (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" i)) *sim*)
              ))
   (with-open-file (stream (merge-pathnames "output/depth.csv") :direction :output :if-exists :append)
@@ -723,12 +724,14 @@
   
   )
 
-;;     (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;; (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+;; (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
 ;;     (defparameter *run-sim* nil)
 (defparameter *debug* nil)
-    ;; (setup)
-    ;; (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
-    ;; (run)
+;; (setup)
+;; (format t "MP count:~D~%" (length (cl-mpm:sim-mps *sim*)))
+;; (test-all-meltwater)
+;(run)
  ;; (if *debug*
  ;;   (progn
  ;;     ;(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
